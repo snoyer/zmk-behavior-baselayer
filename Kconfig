@@ -1,0 +1,5 @@
+DT_COMPAT_ZMK_BEHAVIOR_BASE_LAYER := zmk,behavior-base-layer
+
+config ZMK_BEHAVIOR_BASE_LAYER
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_ZMK_BEHAVIOR_BASE_LAYER))
