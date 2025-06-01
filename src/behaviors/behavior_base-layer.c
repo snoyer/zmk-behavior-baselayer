@@ -37,9 +37,13 @@ static int base_layer_settings_set(const char *name, size_t len, settings_read_c
         if (len != sizeof(state)) {
             return -EINVAL;
         }
-        return MIN(read_cb(cb_arg, &state, sizeof(state)), 0);
+        const int err = read_cb(cb_arg, &state, sizeof(state));
+        if (err <= 0) {
+            LOG_ERR("Failed to read base_layer/state from settings (err %d)", err);
+            return err;
+        }
     }
-    return -ENOENT;
+    return 0;
 }
 
 static void base_layer_save_work_handler(struct k_work *work) {
@@ -49,13 +53,11 @@ static void base_layer_save_work_handler(struct k_work *work) {
 static struct k_work_delayable base_layer_save_work;
 struct settings_handler base_layer_settings_handler = {.name = "base_layer",
                                                        .h_set = base_layer_settings_set};
-#endif /* IS_ENABLED(CONFIG_SETTINGS) */
 
-static int behavior_base_layer_init(const struct device *dev) {
-#if IS_ENABLED(CONFIG_SETTINGS)
+static int base_layer_settings_init(void) {
     settings_subsys_init();
 
-    int err = settings_register(&base_layer_settings_handler);
+    const int err = settings_register(&base_layer_settings_handler);
     if (err) {
         LOG_ERR("Failed to register the base_layer settings handler (err %d)", err);
         return err;
@@ -63,11 +65,13 @@ static int behavior_base_layer_init(const struct device *dev) {
 
     k_work_init_delayable(&base_layer_save_work, base_layer_save_work_handler);
 
-    settings_load_subtree("base_layer");
-#endif /* IS_ENABLED(CONFIG_SETTINGS) */
+    return settings_load_subtree("base_layer");
+}
+SYS_INIT(base_layer_settings_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
 
-    return 0;
-};
+#endif // IS_ENABLED(CONFIG_SETTINGS)
+
+static int behavior_base_layer_init(const struct device *dev) { return 0; };
 
 static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
                                      struct zmk_behavior_binding_event event) {
@@ -86,7 +90,7 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
 
 #if IS_ENABLED(CONFIG_SETTINGS)
     k_work_reschedule(&base_layer_save_work, K_MSEC(CONFIG_ZMK_SETTINGS_SAVE_DEBOUNCE));
-#endif /* IS_ENABLED(CONFIG_SETTINGS) */
+#endif // IS_ENABLED(CONFIG_SETTINGS)
 
     return ZMK_BEHAVIOR_OPAQUE;
 }
