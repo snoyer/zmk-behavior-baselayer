@@ -3,12 +3,17 @@
  *
  * SPDX-License-Identifier: MIT
  */
+#include <dt-bindings/zmk/behaviors.h>
 
 / {
     behaviors {
-        /omit-if-no-ref/ base: base {
+        #if ZMK_BEHAVIOR_OMIT(BASE)
+        /omit-if-no-ref/
+        #endif
+        base: baselayer {
             compatible = "zmk,behavior-base-layer";
             #binding-cells = <1>;
+            display-name = "Base Layer";
         };
     };
 };
