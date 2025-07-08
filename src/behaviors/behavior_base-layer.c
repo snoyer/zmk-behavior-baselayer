@@ -29,6 +29,11 @@ struct base_layer_state {
 
 static struct base_layer_state state;
 
+struct behavior_base_layer_config {
+    uint8_t base_layers_count;
+    uint8_t base_layers[];
+};
+
 #if IS_ENABLED(CONFIG_SETTINGS)
 static int base_layer_settings_set(const char *name, size_t len, settings_read_cb read_cb,
                                    void *cb_arg) {
@@ -71,6 +76,19 @@ SYS_INIT(base_layer_settings_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY
 
 #endif // IS_ENABLED(CONFIG_SETTINGS)
 
+static void set_base_layer(uint8_t layer, const struct behavior_base_layer_config *config) {
+    const uint8_t n = config->base_layers_count;
+    if (n > 0) {
+        LOG_DBG("deactivating %d base layers before using zmk_keymap_layer_activate(%d)", n, layer);
+        for (uint8_t i = 0; i < n; ++i)
+            zmk_keymap_layer_deactivate(config->base_layers[i]);
+        zmk_keymap_layer_activate(layer);
+    } else {
+        LOG_DBG("no base layers set, using zmk_keymap_layer_to(%d)", layer);
+        zmk_keymap_layer_to(layer);
+    }
+}
+
 static int behavior_base_layer_init(const struct device *dev) { return 0; };
 
 static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
@@ -82,7 +100,7 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
     const uint8_t layer = binding->param1;
 
     state.layer_by_enpoint[endpoint_index] = layer;
-    zmk_keymap_layer_to(layer);
+    set_base_layer(layer, zmk_behavior_get_binding(binding->behavior_dev)->config);
 
     char endpoint_str[ZMK_ENDPOINT_STR_LEN];
     zmk_endpoint_instance_to_str(endpoint, endpoint_str, sizeof(endpoint_str));
@@ -101,23 +119,20 @@ static int on_keymap_binding_released(struct zmk_behavior_binding *binding,
     return ZMK_BEHAVIOR_OPAQUE;
 }
 
-static int base_layer_listener(const zmk_event_t *e) {
+static int base_layer_listener(const zmk_event_t *e,
+                               const struct behavior_base_layer_config *config) {
     struct zmk_endpoint_changed *data = as_zmk_endpoint_changed(e);
     if (data != NULL) {
         const int endpoint_index = zmk_endpoint_instance_to_index(data->endpoint);
         const uint8_t layer = state.layer_by_enpoint[endpoint_index];
-        zmk_keymap_layer_to(layer);
+        set_base_layer(layer, config);
 
         char endpoint_str[ZMK_ENDPOINT_STR_LEN];
         zmk_endpoint_instance_to_str(data->endpoint, endpoint_str, sizeof(endpoint_str));
         LOG_INF("restored base layer %d for endpoint %s", layer, endpoint_str);
     }
-
     return ZMK_EV_EVENT_BUBBLE;
 }
-static ZMK_LISTENER(base_layer_listener, base_layer_listener);
-
-ZMK_SUBSCRIPTION(base_layer_listener, zmk_endpoint_changed);
 
 #if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
 
@@ -148,7 +163,22 @@ static const struct behavior_driver_api behavior_base_layer_driver_api = {
 #endif // IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
 };
 
-BEHAVIOR_DT_INST_DEFINE(0, behavior_base_layer_init, NULL, NULL, NULL, POST_KERNEL,
-                        CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &behavior_base_layer_driver_api);
+#define BASE_LAYERS_ITEM(i, n) (DT_INST_PROP_BY_IDX(n, base_layers, i))
+
+#define BASE_LAYER_INST(n)                                                                         \
+    static struct behavior_base_layer_config behavior_base_layer_config_##n = {                    \
+        .base_layers = {LISTIFY(DT_INST_PROP_LEN(n, base_layers), BASE_LAYERS_ITEM, (, ), n)},     \
+        .base_layers_count = DT_INST_PROP_LEN(n, base_layers),                                     \
+    };                                                                                             \
+    BEHAVIOR_DT_INST_DEFINE(n, behavior_base_layer_init, NULL, NULL,                               \
+                            &behavior_base_layer_config_##n, POST_KERNEL,                          \
+                            CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &behavior_base_layer_driver_api); \
+    static int base_layer_listener_##n(const zmk_event_t *e) {                                     \
+        return base_layer_listener(e, &behavior_base_layer_config_##n);                            \
+    }                                                                                              \
+    static ZMK_LISTENER(base_layer_listener_##n, base_layer_listener_##n);                         \
+    ZMK_SUBSCRIPTION(base_layer_listener_##n, zmk_endpoint_changed);
+
+DT_INST_FOREACH_STATUS_OKAY(BASE_LAYER_INST)
 
 #endif // DT_HAS_COMPAT_STATUS_OKAY
