@@ -24,7 +24,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #if DT_HAS_COMPAT_STATUS_OKAY(DT_DRV_COMPAT)
 
 struct base_layer_state {
-    uint8_t layer_by_enpoint[ZMK_ENDPOINT_COUNT];
+    uint8_t layer_by_endpoint[ZMK_ENDPOINT_COUNT];
 };
 
 static struct base_layer_state state;
@@ -99,7 +99,7 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
     const int endpoint_index = zmk_endpoint_instance_to_index(endpoint);
     const uint8_t layer = binding->param1;
 
-    state.layer_by_enpoint[endpoint_index] = layer;
+    state.layer_by_endpoint[endpoint_index] = layer;
     set_base_layer(layer, zmk_behavior_get_binding(binding->behavior_dev)->config);
 
     char endpoint_str[ZMK_ENDPOINT_STR_LEN];
@@ -124,7 +124,7 @@ static int base_layer_listener(const zmk_event_t *e,
     struct zmk_endpoint_changed *data = as_zmk_endpoint_changed(e);
     if (data != NULL) {
         const int endpoint_index = zmk_endpoint_instance_to_index(data->endpoint);
-        const uint8_t layer = state.layer_by_enpoint[endpoint_index];
+        const uint8_t layer = state.layer_by_endpoint[endpoint_index];
         set_base_layer(layer, config);
 
         char endpoint_str[ZMK_ENDPOINT_STR_LEN];
