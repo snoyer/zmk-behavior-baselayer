@@ -81,11 +81,11 @@ static void set_base_layer(uint8_t layer, const struct behavior_base_layer_confi
     if (n > 0) {
         LOG_DBG("deactivating %d base layers before using zmk_keymap_layer_activate(%d)", n, layer);
         for (uint8_t i = 0; i < n; ++i)
-            zmk_keymap_layer_deactivate(config->base_layers[i]);
-        zmk_keymap_layer_activate(layer);
+            zmk_keymap_layer_deactivate(config->base_layers[i], true);
+        zmk_keymap_layer_activate(layer, true);
     } else {
         LOG_DBG("no base layers set, using zmk_keymap_layer_to(%d)", layer);
-        zmk_keymap_layer_to(layer);
+        zmk_keymap_layer_to(layer, true);
     }
 }
 
