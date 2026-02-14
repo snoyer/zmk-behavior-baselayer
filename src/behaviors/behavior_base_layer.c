@@ -95,7 +95,7 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
                                      struct zmk_behavior_binding_event event) {
     LOG_DBG("position %d layer %d", event.position, binding->param1);
 
-    const struct zmk_endpoint_instance endpoint = zmk_endpoints_selected();
+    const struct zmk_endpoint_instance endpoint = zmk_endpoint_get_selected();
     const int endpoint_index = zmk_endpoint_instance_to_index(endpoint);
     const uint8_t layer = binding->param1;
 
